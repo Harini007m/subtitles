@@ -46,13 +46,45 @@ async def upload_video(
     segments = transcribe_audio(audio_path)
 
     # 3️⃣ Translate
+    import concurrent.futures
+
+    # Batch translate all text at once to reduce overhead
+    all_texts = [seg["text"] for seg in segments]
+    
+    if language != "en":
+        try:
+             # Deep Translator sometimes has character limits, but for typical subtitles batching 
+             # by sentence is okay. However, to be safe and fast, let's use a batch approach 
+             # if the library supports it, or optimize the loop. 
+             # iterating with a single translator instance is faster than recreating it.
+             
+             from deep_translator import GoogleTranslator
+             translator = GoogleTranslator(source='auto', target=language)
+             
+             # Translate sequentially but with a single instance (GoogleTranslator doesn't support list natively in all versions)
+             # But we can use concurrent execution more effectively.
+             
+             def translate_single(text):
+                 try:
+                     return translator.translate(text)
+                 except:
+                     return text
+
+             with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                 translated_texts = list(executor.map(translate_single, all_texts))
+                 
+        except Exception as e:
+            print(f"Translation failed: {e}")
+            translated_texts = all_texts
+    else:
+        translated_texts = all_texts
+
     translated_segments = []
-    for seg in segments:
-        translated_text = translate_text(seg["text"], language)
+    for i, seg in enumerate(segments):
         translated_segments.append({
             "start": seg["start"],
             "end": seg["end"],
-            "text": translated_text
+            "text": translated_texts[i]
         })
 
     # 4️⃣ Generate SRT

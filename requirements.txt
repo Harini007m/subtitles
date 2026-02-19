@@ -54,5 +54,6 @@ urllib3==2.6.3
 fastapi>=0.110.0
 python-multipart>=0.0.9
 uvicorn>=0.27.0
-openai-whisper>=20231117
+faster-whisper>=0.10.0
+
 
