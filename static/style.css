@@ -1,0 +1,207 @@
+:root {
+    --bg-color: #0d1117;
+    --card-bg: #161b22;
+    --text-primary: #f0f6fc;
+    --text-secondary: #8b949e;
+    --accent: #58a6ff;
+    --accent-hover: #1f6feb;
+    --border: #30363d;
+    --success: #2ea043;
+}
+
+body {
+    margin: 0;
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    background-color: var(--card-bg);
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    width: 100%;
+    max-width: 600px;
+    text-align: center;
+    animation: fadeIn 0.5s ease;
+}
+
+header h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(90deg, #58a6ff, #a371f7);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+header p {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+}
+
+.upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    cursor: pointer;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+
+.upload-area:hover,
+.upload-area.dragover {
+    border-color: var(--accent);
+    background-color: rgba(88, 166, 255, 0.1);
+}
+
+.upload-icon {
+    width: 48px;
+    height: 48px;
+    color: var(--accent);
+    margin-bottom: 1rem;
+}
+
+.upload-content p {
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.browse-btn {
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.file-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 1rem;
+    word-break: break-all;
+}
+
+.options {
+    margin-bottom: 2rem;
+    text-align: left;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+select {
+    width: 100%;
+    padding: 0.8rem;
+    border-radius: 6px;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+select:focus {
+    border-color: var(--accent);
+}
+
+.primary-btn {
+    width: 100%;
+    padding: 1rem;
+    border-radius: 6px;
+    background-color: var(--success);
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.primary-btn:hover {
+    background-color: #238636;
+}
+
+.primary-btn:active {
+    transform: scale(0.98);
+}
+
+.hidden {
+    display: none;
+}
+
+#loading {
+    margin-top: 2rem;
+}
+
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-left-color: var(--accent);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#result {
+    margin-top: 2rem;
+    animation: fadeIn 0.5s ease;
+}
+
+#output-video {
+    width: 100%;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    background-color: #000;
+}
+
+.secondary-btn {
+    display: inline-block;
+    padding: 0.8rem 1.5rem;
+    border-radius: 6px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.secondary-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}

@@ -26,7 +26,7 @@ def embed_subtitles(video_path, srt_path):
         "ffmpeg",
         "-y",
         "-i", video_path,
-        "-vf", f"subtitles={srt_path_ffmpeg}",
+        "-vf", f"subtitles='{srt_path_ffmpeg}'",
         output_video
     ]
 
