@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>AI Multilingual Caption Generator</title>
+</head>
+
+<body>
+    <h2>Upload Video for Caption Generation</h2>
+
+    <form action="/upload/" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <br><br>
+
+        <label>Select Language:</label>
+        <select name="language">
+            <option value="en">English</option>
+            <option value="ta">Tamil</option>
+            <option value="hi">Hindi</option>
+        </select>
+
+        <br><br>
+        <button type="submit">Generate Captioned Video</button>
+    </form>
+</body>
+
+</html>
