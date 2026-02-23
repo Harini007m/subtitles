@@ -32,6 +32,7 @@ const transcribeLoader = document.getElementById('transcribe-loader');
 const stepUpload = document.getElementById('step-upload');
 const stepPlayer = document.getElementById('step-player');
 const mainVideo = document.getElementById('main-video');
+const subtitleOverlay = document.getElementById('subtitle-overlay');
 const subtitleText = document.getElementById('subtitle-text');
 const translateBadge = document.getElementById('translate-badge');
 const statusLangLabel = document.getElementById('status-lang-label');
@@ -53,6 +54,74 @@ let activeLangCode = 'en';
 let subtitleRafId = null;
 let lastSubIndex = -1;
 let dropdownOpen = false;
+let vttBlobURL = null;   // current VTT object URL (freed on update)
+
+/* ════════════════════════════════════
+   VTT TRACK — for fullscreen subtitles
+   The overlay div can't enter fullscreen with the video element,
+   so we generate a WebVTT blob and attach it as a <track>.
+   The overlay is hidden in fullscreen; the track is hidden otherwise.
+════════════════════════════════════ */
+function toVTTTime(sec) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = (sec % 60).toFixed(3).padStart(6, '0');
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${s}`;
+}
+
+function buildVTT(segments) {
+    let vtt = 'WEBVTT\n\n';
+    segments.forEach((seg, i) => {
+        vtt += `${i + 1}\n`;
+        vtt += `${toVTTTime(seg.start)} --> ${toVTTTime(seg.end)}\n`;
+        vtt += `${seg.text}\n\n`;
+    });
+    return vtt;
+}
+
+function updateVTTTrack(segments) {
+    // Remove any existing <track>
+    const existing = mainVideo.querySelector('track');
+    if (existing) mainVideo.removeChild(existing);
+    if (vttBlobURL) { URL.revokeObjectURL(vttBlobURL); vttBlobURL = null; }
+
+    if (!segments || segments.length === 0) return;
+
+    const blob = new Blob([buildVTT(segments)], { type: 'text/vtt' });
+    vttBlobURL = URL.createObjectURL(blob);
+
+    const track = document.createElement('track');
+    track.kind = 'subtitles';
+    track.label = 'Auto';
+    track.src = vttBlobURL;
+    track.default = true;
+    mainVideo.appendChild(track);
+
+    // Keep hidden until fullscreen — overlay handles normal view
+    if (mainVideo.textTracks[0]) {
+        mainVideo.textTracks[0].mode = 'hidden';
+    }
+}
+
+// Swap overlay ↔ VTT track on fullscreen change
+function onFullscreenChange() {
+    const isFullscreen = !!(document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement);
+    if (isFullscreen) {
+        // Hide DOM overlay; activate VTT track
+        subtitleOverlay.style.display = 'none';
+        if (mainVideo.textTracks[0]) mainVideo.textTracks[0].mode = 'showing';
+    } else {
+        // Show DOM overlay; hide VTT track
+        subtitleOverlay.style.display = '';
+        if (mainVideo.textTracks[0]) mainVideo.textTracks[0].mode = 'hidden';
+    }
+}
+
+document.addEventListener('fullscreenchange', onFullscreenChange);
+document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+document.addEventListener('mozfullscreenchange', onFullscreenChange);
 
 /* ════════════════════════════════════
    BUILD DROPDOWN OPTIONS
@@ -201,6 +270,8 @@ transcribeBtn.addEventListener('click', async () => {
         stepUpload.classList.add('hidden');
         stepPlayer.classList.remove('hidden');
 
+        // Build VTT track for fullscreen and start overlay loop
+        updateVTTTrack(currentSegments);
         startSubtitleLoop();
 
     } catch (err) {
@@ -266,7 +337,8 @@ async function switchLanguage(langCode, langLabel) {
         currentSegments = segmentCache[langCode];
         activeLangCode = langCode;
         lastSubIndex = -1;
-        updateStatusBar(langLabel, langFlag);
+        updateVTTTrack(currentSegments);
+        updateStatusBar(langLabel);
         return;
     }
 
@@ -288,7 +360,8 @@ async function switchLanguage(langCode, langLabel) {
         currentSegments = data.segments;
         activeLangCode = langCode;
         lastSubIndex = -1;
-        updateStatusBar(langLabel, langFlag);
+        updateVTTTrack(currentSegments);
+        updateStatusBar(langLabel);
 
     } catch (err) {
         console.error('[translate]', err);
@@ -324,6 +397,10 @@ resetBtn.addEventListener('click', () => {
     segmentCache = {};
     activeLangCode = 'en';
     lastSubIndex = -1;
+
+    // Clean up VTT blob
+    updateVTTTrack([]);
+    if (vttBlobURL) { URL.revokeObjectURL(vttBlobURL); vttBlobURL = null; }
 
     fileInput.value = '';
     fileBadge.classList.add('hidden');
