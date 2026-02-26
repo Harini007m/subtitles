@@ -30,6 +30,7 @@ def extract_audio(video_path: str) -> str:
 
 
 def embed_subtitles(video_path, srt_path):
+    """Original embed — keeps source container format."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     output_video = os.path.join(
@@ -37,7 +38,6 @@ def embed_subtitles(video_path, srt_path):
         "captioned_" + os.path.basename(video_path)
     )
 
-    # Convert Windows backslashes to forward slashes for ffmpeg subtitle filter
     srt_path_ffmpeg = srt_path.replace("\\", "/").replace(":", "\\:")
 
     command = [
@@ -47,5 +47,41 @@ def embed_subtitles(video_path, srt_path):
         output_video
     ]
 
-    subprocess.run(command)
+    subprocess.run(command, check=True)
+    return output_video
+
+
+def embed_subtitles_mp4(video_path, srt_path):
+    """Burn subtitles into video and always output a standard .mp4 file.
+
+    Uses libx264 + aac so the result is universally playable, regardless
+    of the original container format (MKV, MOV, AVI, WebM …).
+    """
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    # Force output filename extension to .mp4
+    base_name = os.path.splitext(os.path.basename(video_path))[0]
+    output_video = os.path.join(OUTPUT_DIR, f"captioned_{base_name}.mp4")
+
+    # ffmpeg needs forward-slashes and escaped colons for the subtitles filter
+    srt_path_ffmpeg = srt_path.replace("\\", "/").replace(":", "\\:")
+
+    command = [
+        "ffmpeg", "-y",
+        "-i", video_path,
+        "-vf", f"subtitles='{srt_path_ffmpeg}'",
+        "-c:v", "libx264",   # H.264 video — universally compatible
+        "-preset", "fast",   # balance speed vs. size
+        "-crf", "23",         # quality (18=best, 28=worst); 23 is default
+        "-c:a", "aac",        # AAC audio — works in every MP4 player
+        "-b:a", "128k",
+        "-movflags", "+faststart",  # enable streaming / quick open
+        output_video
+    ]
+
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"[ffmpeg burnin error]\n{result.stderr}")
+        raise RuntimeError(f"ffmpeg burn-in failed: {result.stderr[-400:]}")
+
     return output_video

@@ -45,6 +45,24 @@ const triggerBtn = document.getElementById('lang-dropdown-btn');
 const selLabel = document.getElementById('sel-label');
 const langDropdown = document.getElementById('lang-dropdown');
 
+// Action buttons
+const showTranscriptBtn = document.getElementById('show-transcript-btn');
+const downloadTranscriptBtn = document.getElementById('download-transcript-btn');
+const downloadVideoBtn = document.getElementById('download-video-btn');
+
+// Author editor
+const toggleEditorBtn = document.getElementById('toggle-editor-btn');
+const authorPanel = document.getElementById('author-panel');
+const closeEditorBtn = document.getElementById('close-editor-btn');
+const editorSegments = document.getElementById('editor-segments');
+const burninBtn = document.getElementById('burnin-btn');
+const burninLoader = document.getElementById('burnin-loader');
+
+// Transcript modal
+const transcriptModal = document.getElementById('transcript-modal');
+const transcriptContent = document.getElementById('transcript-content');
+const closeModalBtn = document.getElementById('close-modal-btn');
+
 /* ── State ── */
 let currentFile = null;
 let uploadedFilename = null;
@@ -58,9 +76,6 @@ let vttBlobURL = null;   // current VTT object URL (freed on update)
 
 /* ════════════════════════════════════
    VTT TRACK — for fullscreen subtitles
-   The overlay div can't enter fullscreen with the video element,
-   so we generate a WebVTT blob and attach it as a <track>.
-   The overlay is hidden in fullscreen; the track is hidden otherwise.
 ════════════════════════════════════ */
 function toVTTTime(sec) {
     const h = Math.floor(sec / 3600);
@@ -80,7 +95,6 @@ function buildVTT(segments) {
 }
 
 function updateVTTTrack(segments) {
-    // Remove any existing <track>
     const existing = mainVideo.querySelector('track');
     if (existing) mainVideo.removeChild(existing);
     if (vttBlobURL) { URL.revokeObjectURL(vttBlobURL); vttBlobURL = null; }
@@ -97,23 +111,19 @@ function updateVTTTrack(segments) {
     track.default = true;
     mainVideo.appendChild(track);
 
-    // Keep hidden until fullscreen — overlay handles normal view
     if (mainVideo.textTracks[0]) {
         mainVideo.textTracks[0].mode = 'hidden';
     }
 }
 
-// Swap overlay ↔ VTT track on fullscreen change
 function onFullscreenChange() {
     const isFullscreen = !!(document.fullscreenElement ||
         document.webkitFullscreenElement ||
         document.mozFullScreenElement);
     if (isFullscreen) {
-        // Hide DOM overlay; activate VTT track
         subtitleOverlay.style.display = 'none';
         if (mainVideo.textTracks[0]) mainVideo.textTracks[0].mode = 'showing';
     } else {
-        // Show DOM overlay; hide VTT track
         subtitleOverlay.style.display = '';
         if (mainVideo.textTracks[0]) mainVideo.textTracks[0].mode = 'hidden';
     }
@@ -145,18 +155,15 @@ function buildDropdown() {
         });
         langDropdown.appendChild(li);
     });
-    // start closed
     langDropdown.classList.add('closed');
 }
 buildDropdown();
 
-/* ── Toggle dropdown ── */
 triggerBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     dropdownOpen ? closeDropdown() : openDropdown();
 });
 
-// Close on outside click
 document.addEventListener('click', () => { if (dropdownOpen) closeDropdown(); });
 langDropdown.addEventListener('click', e => e.stopPropagation());
 
@@ -164,7 +171,6 @@ function openDropdown() {
     dropdownOpen = true;
     langDropdown.classList.remove('closed');
     triggerBtn.setAttribute('aria-expanded', 'true');
-    // scroll active option into view
     const active = langDropdown.querySelector('[aria-selected="true"]');
     if (active) active.scrollIntoView({ block: 'nearest' });
 }
@@ -261,7 +267,6 @@ transcribeBtn.addEventListener('click', async () => {
         statusLangLabel.textContent = 'English (original)';
         statusSegCount.textContent = `${currentSegments.length} segments`;
 
-        // Reset dropdown to English
         updateDropdownSelection('en', 'English');
 
         mainVideo.src = `/video/${encodeURIComponent(uploadedFilename)}`;
@@ -270,7 +275,10 @@ transcribeBtn.addEventListener('click', async () => {
         stepUpload.classList.add('hidden');
         stepPlayer.classList.remove('hidden');
 
-        // Build VTT track for fullscreen and start overlay loop
+        // Reset download video btn
+        downloadVideoBtn.classList.add('hidden');
+        downloadVideoBtn.dataset.output = '';
+
         updateVTTTrack(currentSegments);
         startSubtitleLoop();
 
@@ -329,10 +337,8 @@ function findSegment(time) {
 async function switchLanguage(langCode, langLabel) {
     if (langCode === activeLangCode) return;
 
-    // Update trigger button UI immediately
     updateDropdownSelection(langCode, langLabel);
 
-    // Instant from cache
     if (segmentCache[langCode]) {
         currentSegments = segmentCache[langCode];
         activeLangCode = langCode;
@@ -342,7 +348,6 @@ async function switchLanguage(langCode, langLabel) {
         return;
     }
 
-    // Fetch from server
     triggerBtn.disabled = true;
     translateBadge.classList.remove('hidden');
 
@@ -366,7 +371,6 @@ async function switchLanguage(langCode, langLabel) {
     } catch (err) {
         console.error('[translate]', err);
         showToast(`Could not translate to ${langLabel}: ${err.message}`, 'error');
-        // Revert dropdown
         const prev = LANGUAGES.find(l => l.code === activeLangCode);
         if (prev) updateDropdownSelection(prev.code, prev.label);
     } finally {
@@ -379,6 +383,219 @@ function updateStatusBar(langLabel) {
     statusLangLabel.textContent = langLabel;
     statusSegCount.textContent = `${currentSegments.length} segments`;
 }
+
+/* ════════════════════════════════════
+   SHOW TRANSCRIPT — modal
+════════════════════════════════════ */
+showTranscriptBtn.addEventListener('click', () => {
+    if (!currentSegments.length) {
+        showToast('No transcript available.', 'error');
+        return;
+    }
+    transcriptContent.innerHTML = '';
+
+    currentSegments.forEach((seg, i) => {
+        const row = document.createElement('div');
+        row.className = 'transcript-row';
+
+        const ts = document.createElement('span');
+        ts.className = 'transcript-ts';
+        ts.textContent = formatTime(seg.start) + ' → ' + formatTime(seg.end);
+
+        const txt = document.createElement('span');
+        txt.className = 'transcript-line';
+        txt.textContent = seg.text.trim();
+
+        row.appendChild(ts);
+        row.appendChild(txt);
+        transcriptContent.appendChild(row);
+    });
+
+    transcriptModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+});
+
+closeModalBtn.addEventListener('click', closeTranscriptModal);
+transcriptModal.addEventListener('click', (e) => {
+    if (e.target === transcriptModal) closeTranscriptModal();
+});
+
+function closeTranscriptModal() {
+    transcriptModal.classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeTranscriptModal();
+        closeAuthorPanel();
+    }
+});
+
+/* ════════════════════════════════════
+   DOWNLOAD TRANSCRIPT
+════════════════════════════════════ */
+downloadTranscriptBtn.addEventListener('click', async () => {
+    if (!uploadedFilename || !currentSegments.length) {
+        showToast('No transcript available to download.', 'error');
+        return;
+    }
+
+    downloadTranscriptBtn.disabled = true;
+    downloadTranscriptBtn.textContent = 'Preparing…';
+
+    try {
+        const res = await fetch('/download-transcript/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: uploadedFilename, segments: currentSegments })
+        });
+
+        if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.error || `Server error ${res.status}`);
+        }
+
+        // Trigger browser download
+        const blob = await res.blob();
+        const base = uploadedFilename.replace(/\.[^.]+$/, '');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = base + '_transcript.docx';
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showToast('Transcript downloaded!', 'info');
+
+    } catch (err) {
+        console.error('[download-transcript]', err);
+        showToast(`Failed to download transcript: ${err.message}`, 'error');
+    } finally {
+        downloadTranscriptBtn.disabled = false;
+        downloadTranscriptBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download Transcript`;
+    }
+});
+
+/* ════════════════════════════════════
+   DOWNLOAD SUBTITLED VIDEO
+════════════════════════════════════ */
+downloadVideoBtn.addEventListener('click', () => {
+    const outFile = downloadVideoBtn.dataset.output;
+    if (!outFile) return;
+    const a = document.createElement('a');
+    a.href = `/download-video/${encodeURIComponent(outFile)}`;
+    a.download = outFile;
+    a.click();
+});
+
+/* ════════════════════════════════════
+   AUTHOR SUBTITLE EDITOR
+════════════════════════════════════ */
+toggleEditorBtn.addEventListener('click', () => {
+    if (authorPanel.classList.contains('hidden')) {
+        openAuthorPanel();
+    } else {
+        closeAuthorPanel();
+    }
+});
+
+closeEditorBtn.addEventListener('click', closeAuthorPanel);
+
+function openAuthorPanel() {
+    buildEditorRows();
+    authorPanel.classList.remove('hidden');
+    authorPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    toggleEditorBtn.textContent = '✕ Close Editor';
+}
+
+function closeAuthorPanel() {
+    authorPanel.classList.add('hidden');
+    toggleEditorBtn.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+        Edit Subtitles (Author)`;
+}
+
+function buildEditorRows() {
+    editorSegments.innerHTML = '';
+    currentSegments.forEach((seg, i) => {
+        const row = document.createElement('div');
+        row.className = 'editor-row';
+        row.dataset.index = i;
+
+        const ts = document.createElement('span');
+        ts.className = 'editor-ts';
+        ts.textContent = `${formatTime(seg.start)} → ${formatTime(seg.end)}`;
+
+        const ta = document.createElement('textarea');
+        ta.className = 'editor-textarea';
+        ta.rows = 2;
+        ta.value = seg.text.trim();
+        ta.dataset.index = i;
+        ta.addEventListener('input', () => {
+            currentSegments[i] = { ...currentSegments[i], text: ta.value };
+            // Invalidate caches for current lang so subtitle loop picks new text
+            segmentCache[activeLangCode] = currentSegments.map(s => ({ ...s }));
+            lastSubIndex = -1;
+        });
+
+        row.appendChild(ts);
+        row.appendChild(ta);
+        editorSegments.appendChild(row);
+    });
+}
+
+/* ── Burn-in ── */
+burninBtn.addEventListener('click', async () => {
+    if (!uploadedFilename || !currentSegments.length) {
+        showToast('Nothing to burn in.', 'error');
+        return;
+    }
+
+    burninBtn.disabled = true;
+    burninLoader.classList.remove('hidden');
+    showToast('Burning subtitles into video, please wait…', 'info');
+
+    try {
+        const res = await fetch('/burnin/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                filename: uploadedFilename,
+                segments: currentSegments
+            })
+        });
+
+        let data;
+        try { data = await res.json(); } catch { data = {}; }
+        if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+
+        const outFile = data.output_filename;
+        downloadVideoBtn.dataset.output = outFile;
+        downloadVideoBtn.classList.remove('hidden');
+
+        showToast('✅ Subtitles burned in! You can now download the video.', 'info');
+        closeAuthorPanel();
+
+    } catch (err) {
+        console.error('[burnin]', err);
+        showToast(`Burn-in failed: ${err.message}`, 'error');
+    } finally {
+        burninBtn.disabled = false;
+        burninLoader.classList.add('hidden');
+    }
+});
 
 /* ════════════════════════════════════
    RESET
@@ -398,7 +615,6 @@ resetBtn.addEventListener('click', () => {
     activeLangCode = 'en';
     lastSubIndex = -1;
 
-    // Clean up VTT blob
     updateVTTTrack([]);
     if (vttBlobURL) { URL.revokeObjectURL(vttBlobURL); vttBlobURL = null; }
 
@@ -409,16 +625,30 @@ resetBtn.addEventListener('click', () => {
     transcribeLoader.classList.add('hidden');
     subtitleText.textContent = '';
 
-    updateDropdownSelection('en', 'English', '🇬🇧');
+    updateDropdownSelection('en', 'English');
     closeDropdown();
+    closeAuthorPanel();
+    closeTranscriptModal();
+
+    downloadVideoBtn.classList.add('hidden');
+    downloadVideoBtn.dataset.output = '';
 
     stepPlayer.classList.add('hidden');
     stepUpload.classList.remove('hidden');
 });
 
 /* ════════════════════════════════════
-   TOAST
+   UTILITIES
 ════════════════════════════════════ */
+function formatTime(sec) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    if (h > 0) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/* ═══ TOAST ═══ */
 let toastTimer = null;
 function showToast(msg, type = 'info') {
     let el = document.getElementById('__toast');

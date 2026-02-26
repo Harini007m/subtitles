@@ -1,14 +1,14 @@
 import os
 import re
 import concurrent.futures
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Body
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from fastapi.staticfiles import StaticFiles
 
 from app.transcription import transcribe_audio
-from app.video_utils import extract_audio
+from app.video_utils import extract_audio, embed_subtitles, embed_subtitles_mp4
 
 app = FastAPI()
 
@@ -24,12 +24,33 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 # In-memory cache: safe_filename -> original segments (English)
 transcription_cache = {}
 
+# Cache for the latest burned-in video per filename
+burnin_cache = {}
+
 
 def safe_filename(name: str) -> str:
     """Remove special chars and spaces from filename to avoid ffmpeg/path issues."""
     base, ext = os.path.splitext(name)
     base = re.sub(r"[^\w\-]", "_", base)   # keep letters, digits, _, -
     return base + ext.lower()
+
+
+def segments_to_srt(segments: list) -> str:
+    """Convert segment list to SRT format string."""
+    def fmt(sec):
+        h = int(sec // 3600)
+        m = int((sec % 3600) // 60)
+        s = sec % 60
+        ms = int((s - int(s)) * 1000)
+        return f"{h:02d}:{m:02d}:{int(s):02d},{ms:03d}"
+
+    lines = []
+    for i, seg in enumerate(segments, start=1):
+        lines.append(str(i))
+        lines.append(f"{fmt(seg['start'])} --> {fmt(seg['end'])}")
+        lines.append(seg["text"].strip())
+        lines.append("")
+    return "\n".join(lines)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -96,7 +117,7 @@ async def stream_video(filename: str):
 @app.post("/translate/")
 async def translate_segments(
     filename: str = Form(...),
-    language: str = Form(...)
+    language: str = Form(...),
 ):
     """
     Step 2 (live): Translate already-transcribed segments into a new language.
@@ -142,3 +163,121 @@ async def translate_segments(
     ]
 
     return JSONResponse({"segments": translated_segments})
+
+
+@app.post("/burnin/")
+async def burnin_subtitles(payload: dict = Body(...)):
+    """
+    Author-only: Accept edited segments + filename, burn subtitles into video,
+    cache the output path, and return the output filename (always .mp4).
+    """
+    filename = payload.get("filename")
+    segments = payload.get("segments", [])
+
+    if not filename:
+        return JSONResponse({"error": "filename is required"}, status_code=400)
+
+    video_path = os.path.join(UPLOAD_DIR, filename)
+    if not os.path.exists(video_path):
+        return JSONResponse({"error": "Original video not found"}, status_code=404)
+
+    # Write SRT to outputs dir
+    srt_filename = os.path.splitext(filename)[0] + "_subtitle.srt"
+    srt_path = os.path.join(OUTPUT_DIR, srt_filename)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    srt_content = segments_to_srt(segments)
+    with open(srt_path, "w", encoding="utf-8") as f:
+        f.write(srt_content)
+
+    try:
+        output_video_path = embed_subtitles_mp4(video_path, srt_path)
+    except Exception as e:
+        print(f"[burnin error] {e}")
+        return JSONResponse({"error": f"Burn-in failed: {str(e)}"}, status_code=500)
+
+    output_basename = os.path.basename(output_video_path)
+    burnin_cache[filename] = output_video_path
+
+    return JSONResponse({"output_filename": output_basename})
+
+
+@app.get("/download-video/{filename}")
+async def download_output_video(filename: str):
+    """Download the burned-in subtitle video."""
+    video_path = os.path.join(OUTPUT_DIR, filename)
+    if not os.path.exists(video_path):
+        return JSONResponse({"error": "Output video not found"}, status_code=404)
+
+    return FileResponse(
+        video_path,
+        media_type="video/mp4",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.post("/download-transcript/")
+async def download_transcript(payload: dict = Body(...)):
+    """
+    Return a Word (.docx) transcript of the current segments.
+    """
+    from docx import Document
+    from docx.shared import Pt
+
+    filename = payload.get("filename")
+    segments = payload.get("segments", [])
+
+    if not filename:
+        return JSONResponse({"error": "filename is required"}, status_code=400)
+
+    def fmt_time(sec):
+        h = int(sec // 3600)
+        m = int((sec % 3600) // 60)
+        s = int(sec % 60)
+        return f"{h:02d}:{m:02d}:{s:02d}"
+
+    doc = Document()
+
+    # ── Title (plain paragraph + run — avoids heading.runs[] IndexError) ──
+    title_para = doc.add_paragraph()
+    title_para.alignment = 1          # 1 = CENTER
+    title_run = title_para.add_run("Transcript")
+    title_run.bold = True
+    title_run.font.size = Pt(20)
+
+    # ── Source filename ──
+    src_para = doc.add_paragraph()
+    src_para.alignment = 1            # CENTER
+    src_run = src_para.add_run(
+        "Source: " + os.path.splitext(filename)[0].replace("_", " ")
+    )
+    src_run.font.size = Pt(10)
+
+    doc.add_paragraph()               # blank spacer line
+
+    # ── One paragraph per subtitle segment ──
+    for seg in segments:
+        ts = f"[{fmt_time(seg['start'])}  ->  {fmt_time(seg['end'])}]"
+        text = seg["text"].strip()
+
+        para = doc.add_paragraph()
+        # Timestamp run — bold, small
+        ts_run = para.add_run(ts + "   ")
+        ts_run.bold = True
+        ts_run.font.size = Pt(9)
+        # Subtitle text run
+        txt_run = para.add_run(text)
+        txt_run.font.size = Pt(11)
+        para.paragraph_format.space_after = Pt(4)
+
+    base = os.path.splitext(filename)[0]
+    docx_filename = base + "_transcript.docx"
+    docx_path = os.path.join(OUTPUT_DIR, docx_filename)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    doc.save(docx_path)
+
+    return FileResponse(
+        docx_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{docx_filename}"'}
+    )

@@ -9,7 +9,7 @@
         content="Upload a video, auto-transcribe it, and switch subtitles live across Tamil, Hindi, English, and many more languages.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=3">
+    <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 
 <body>
@@ -138,6 +138,102 @@
                 <span id="status-seg-count" class="seg-count"></span>
             </div>
 
+            <!-- ── Action Buttons Row ── -->
+            <div class="action-row" id="action-row">
+                <!-- Show Transcript -->
+                <button id="show-transcript-btn" class="btn btn-action">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                        <line x1="10" y1="9" x2="8" y2="9" />
+                    </svg>
+                    Show Transcript
+                </button>
+
+                <!-- Download Transcript -->
+                <button id="download-transcript-btn" class="btn btn-action">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download Transcript
+                </button>
+
+                <!-- Download Subtitled Video (hidden until burn-in done) -->
+                <button id="download-video-btn" class="btn btn-action hidden" data-output="">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
+                        <line x1="7" y1="2" x2="7" y2="22" />
+                        <line x1="17" y1="2" x2="17" y2="22" />
+                        <line x1="2" y1="12" x2="22" y2="12" />
+                        <line x1="2" y1="7" x2="7" y2="7" />
+                        <line x1="2" y1="17" x2="7" y2="17" />
+                        <line x1="17" y1="17" x2="22" y2="17" />
+                        <line x1="17" y1="7" x2="22" y2="7" />
+                    </svg>
+                    Download Subtitled Video
+                </button>
+            </div>
+
+            <!-- ═══════════ AUTHOR EDITOR PANEL ═══════════ -->
+            <div id="author-panel" class="author-panel hidden">
+                <div class="author-panel-header">
+                    <div class="author-panel-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                        <span>Author Subtitle Editor</span>
+                        <span class="author-badge">Author Only</span>
+                    </div>
+                    <button id="close-editor-btn" class="icon-btn" title="Close editor" aria-label="Close editor">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="author-panel-sub">Edit any subtitle segment below, then burn them permanently into the video.
+                </p>
+
+                <div id="editor-segments" class="editor-segments"></div>
+
+                <div class="editor-actions">
+                    <button id="burnin-btn" class="btn btn-burnin">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path
+                                d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+                        </svg>
+                        Burn Subtitles into Video
+                    </button>
+                    <div id="burnin-loader" class="burnin-loader hidden">
+                        <div class="mini-spin"></div>
+                        <span>Burning subtitles… this may take a minute</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toggle Author editor button (bottom of player section) -->
+            <div class="author-toggle-row">
+                <button id="toggle-editor-btn" class="btn btn-author-toggle">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    Edit Subtitles (Author)
+                </button>
+            </div>
+
             <!-- Reset -->
             <button id="reset-btn" class="btn btn-secondary" style="margin-top:1.2rem;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -151,7 +247,34 @@
 
     </div>
 
-    <script src="/static/script.js?v=3"></script>
+    <!-- ═══════════ TRANSCRIPT MODAL ═══════════ -->
+    <div id="transcript-modal" class="modal-overlay hidden" role="dialog" aria-modal="true"
+        aria-labelledby="transcript-modal-title">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2 class="modal-title" id="transcript-modal-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                    Transcript
+                </h2>
+                <button id="close-modal-btn" class="icon-btn" title="Close" aria-label="Close transcript">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div id="transcript-content" class="transcript-content"></div>
+        </div>
+    </div>
+
+    <script src="/static/script.js?v=4"></script>
 </body>
 
 </html>
