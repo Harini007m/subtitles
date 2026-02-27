@@ -8,7 +8,7 @@ from fastapi.requests import Request
 from fastapi.staticfiles import StaticFiles
 
 from app.transcription import transcribe_audio
-from app.video_utils import extract_audio, embed_subtitles, embed_subtitles_mp4
+from app.video_utils import extract_audio, embed_subtitles, embed_subtitles_mp4, remux_to_mp4
 
 app = FastAPI()
 
@@ -213,6 +213,41 @@ async def download_output_video(filename: str):
         video_path,
         media_type="video/mp4",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.get("/download-mp4/{filename}")
+async def download_original_as_mp4(filename: str):
+    """
+    Download the original uploaded video as an MP4 file.
+    If the upload is already .mp4, serve it directly.
+    Otherwise re-mux it to MP4 with ffmpeg (fast, no re-encode) and cache the result.
+    """
+    upload_path = os.path.join(UPLOAD_DIR, filename)
+    if not os.path.exists(upload_path):
+        return JSONResponse({"error": "Video not found"}, status_code=404)
+
+    ext = os.path.splitext(filename)[1].lower()
+    if ext == ".mp4":
+        # Already MP4 — serve directly
+        dl_name = filename
+        serve_path = upload_path
+    else:
+        # Re-mux (copy streams) to MP4 — very fast, no quality loss
+        base_name = os.path.splitext(filename)[0]
+        dl_name = base_name + ".mp4"
+        serve_path = os.path.join(OUTPUT_DIR, f"original_{dl_name}")
+        if not os.path.exists(serve_path):
+            try:
+                remux_to_mp4(upload_path, serve_path)
+            except Exception as e:
+                print(f"[remux error] {e}")
+                return JSONResponse({"error": f"Conversion failed: {str(e)}"}, status_code=500)
+
+    return FileResponse(
+        serve_path,
+        media_type="video/mp4",
+        headers={"Content-Disposition": f'attachment; filename="{dl_name}"'}
     )
 
 

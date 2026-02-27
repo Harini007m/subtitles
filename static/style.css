@@ -852,6 +852,26 @@ body {
     box-shadow: 0 4px 18px rgba(34, 197, 94, 0.22);
 }
 
+/* Download MP4 button — cyan accent */
+.btn-download-mp4 {
+    background: rgba(6, 182, 212, 0.1);
+    border-color: rgba(6, 182, 212, 0.35);
+    color: #67e8f9;
+}
+
+.btn-download-mp4:hover:not(:disabled) {
+    background: rgba(6, 182, 212, 0.2);
+    border-color: rgba(103, 232, 249, 0.55);
+    color: #a5f3fc;
+    box-shadow: 0 4px 18px rgba(6, 182, 212, 0.22);
+    transform: translateY(-1px);
+}
+
+.btn-download-mp4:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* ═══════════════════════════════════
    AUTHOR TOGGLE ROW
 ═══════════════════════════════════ */

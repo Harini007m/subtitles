@@ -85,3 +85,27 @@ def embed_subtitles_mp4(video_path, srt_path):
         raise RuntimeError(f"ffmpeg burn-in failed: {result.stderr[-400:]}")
 
     return output_video
+
+
+def remux_to_mp4(input_path: str, output_path: str) -> str:
+    """Re-mux any video into an MP4 container by copying streams (no re-encode).
+
+    This is very fast because audio/video data is not decoded or re-encoded.
+    The result is a standard, universally-playable .mp4 file.
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    command = [
+        "ffmpeg", "-y",
+        "-i", input_path,
+        "-c", "copy",           # copy all streams as-is — no re-encode
+        "-movflags", "+faststart",
+        output_path
+    ]
+
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"[ffmpeg remux error]\n{result.stderr}")
+        raise RuntimeError(f"ffmpeg remux failed: {result.stderr[-400:]}")
+
+    return output_path

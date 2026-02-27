@@ -48,6 +48,7 @@ const langDropdown = document.getElementById('lang-dropdown');
 // Action buttons
 const showTranscriptBtn = document.getElementById('show-transcript-btn');
 const downloadTranscriptBtn = document.getElementById('download-transcript-btn');
+const downloadMp4Btn = document.getElementById('download-mp4-btn');
 const downloadVideoBtn = document.getElementById('download-video-btn');
 
 // Author editor
@@ -481,6 +482,56 @@ downloadTranscriptBtn.addEventListener('click', async () => {
                 <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
             Download Transcript`;
+    }
+});
+
+/* ════════════════════════════════════
+   DOWNLOAD ORIGINAL MP4
+════════════════════════════════════ */
+downloadMp4Btn.addEventListener('click', async () => {
+    if (!uploadedFilename) {
+        showToast('No video loaded.', 'error');
+        return;
+    }
+
+    downloadMp4Btn.disabled = true;
+    downloadMp4Btn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+        </svg>
+        Preparing…`;
+
+    try {
+        const res = await fetch(`/download-mp4/${encodeURIComponent(uploadedFilename)}`);
+        if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.error || `Server error ${res.status}`);
+        }
+
+        const blob = await res.blob();
+        const base = uploadedFilename.replace(/\.[^.]+$/, '');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = base + '.mp4';
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showToast('MP4 download started!', 'info');
+    } catch (err) {
+        console.error('[download-mp4]', err);
+        showToast(`Download failed: ${err.message}`, 'error');
+    } finally {
+        downloadMp4Btn.disabled = false;
+        downloadMp4Btn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download MP4`;
     }
 });
 
