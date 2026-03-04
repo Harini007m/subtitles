@@ -266,7 +266,7 @@ async function switchLanguage(langCode, langLabel) {
         currentSegments = segmentCache[langCode];
         activeLangCode = langCode;
         lastSubIndex = -1;
-        updateStatusBar(langLabel, langFlag);
+        updateStatusBar(langLabel);
         return;
     }
 
@@ -288,7 +288,7 @@ async function switchLanguage(langCode, langLabel) {
         currentSegments = data.segments;
         activeLangCode = langCode;
         lastSubIndex = -1;
-        updateStatusBar(langLabel, langFlag);
+        updateStatusBar(langLabel);
 
     } catch (err) {
         console.error('[translate]', err);
